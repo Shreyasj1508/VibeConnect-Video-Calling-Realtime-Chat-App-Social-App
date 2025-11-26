@@ -30,19 +30,22 @@ const ChatPage = () => {
 
   const { authUser } = useAuthUser();
 
-  const { data: tokenData } = useQuery({
+  const { data: tokenData, isLoading: isTokenLoading } = useQuery({
     queryKey: ["streamToken"],
     queryFn: getStreamToken,
-    enabled: !!authUser, // this will run only when authUser is available
+    enabled: !!authUser,
   });
 
   useEffect(() => {
+    if (!authUser || isTokenLoading) return;
+
+    if (!tokenData?.token) {
+      setLoading(false);
+      return;
+    }
+
     const initChat = async () => {
-      if (!tokenData?.token || !authUser) return;
-
       try {
-        console.log("Initializing stream chat client...");
-
         const client = StreamChat.getInstance(STREAM_API_KEY);
 
         await client.connectUser(
@@ -54,12 +57,7 @@ const ChatPage = () => {
           tokenData.token
         );
 
-        //
         const channelId = [authUser._id, targetUserId].sort().join("-");
-
-        // you and me
-        // if i start the chat => channelId: [myId, yourId]
-        // if you start the chat => channelId: [yourId, myId]  => [myId,yourId]
 
         const currChannel = client.channel("messaging", channelId, {
           members: [authUser._id, targetUserId],
@@ -78,21 +76,33 @@ const ChatPage = () => {
     };
 
     initChat();
-  }, [tokenData, authUser, targetUserId]);
+  }, [tokenData, authUser, targetUserId, isTokenLoading]);
 
   const handleVideoCall = () => {
     if (channel) {
       const callUrl = `${window.location.origin}/call/${channel.id}`;
-
       channel.sendMessage({
         text: `I've started a video call. Join me here: ${callUrl}`,
       });
-
       toast.success("Video call link sent successfully!");
     }
   };
 
-  if (loading || !chatClient || !channel) return <ChatLoader />;
+  if (loading && !chatClient) return <ChatLoader />;
+
+  if (!chatClient || !channel) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[80vh] gap-4">
+        <p className="text-error font-semibold">Failed to initialize chat</p>
+        <button 
+          className="btn btn-primary"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[93vh]">
