@@ -101,6 +101,9 @@ const App = () => {
             )
           }
         />
+
+        <Route path="/chat" element={<Navigate to="/" />} />
+        <Route path="/friends" element={<Navigate to="/" />} />
       </Routes>
 
       <Toaster />
@@ -108,3 +111,5 @@ const App = () => {
   );
 };
 export default App;
+
+
