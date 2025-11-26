@@ -6,12 +6,14 @@ export async function signup(req, res) {
   const { email, password, fullName } = req.body;
 
   try {
+    console.log("Signup request received:", { email, fullName, passwordLength: password?.length });
+
     if (!email || !password || !fullName) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
     if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
+      return res.status(400).json({ message: `Password must be at least 6 characters (received ${password.length})` });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
