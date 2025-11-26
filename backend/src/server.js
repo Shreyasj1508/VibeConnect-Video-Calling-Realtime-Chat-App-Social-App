@@ -18,7 +18,10 @@ const __dirname = path.resolve();
 app.use(
   cors({
     origin: process.env.NODE_ENV === "production" 
-      ? process.env.FRONTEND_URL || "https://vibe-connect-video-calling-realtime-taupe.vercel.app"
+      ? [
+          "https://vibe-connect-video-calling-realtime.vercel.app",
+          "https://vibe-connect-video-calling-realtime-taupe.vercel.app"
+        ]
       : "http://localhost:5173",
     credentials: true,
   })
