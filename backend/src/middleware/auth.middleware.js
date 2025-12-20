@@ -9,10 +9,17 @@ export const protectRoute = async (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized - No token provided" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    if (!process.env.JWT_SECRET_KEY) {
+      console.error("JWT_SECRET_KEY is not defined");
+      return res.status(500).json({ message: "Server configuration error" });
+    }
 
-    if (!decoded) {
-      return res.status(401).json({ message: "Unauthorized - Invalid token" });
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    } catch (jwtError) {
+      // JWT verification failed (expired, invalid, etc.)
+      return res.status(401).json({ message: "Unauthorized - Invalid or expired token" });
     }
 
     const user = await User.findById(decoded.userId).select("-password");
@@ -25,7 +32,7 @@ export const protectRoute = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.log("Error in protectRoute middleware", error);
+    console.error("Error in protectRoute middleware:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

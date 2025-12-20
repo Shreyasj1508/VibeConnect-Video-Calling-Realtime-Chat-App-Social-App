@@ -18,21 +18,29 @@ export async function signup(req, res) {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!emailRegex.test(email)) {
+    // Normalize email to lowercase for consistent storage
+    const normalizedEmail = email.toLowerCase().trim();
+
+    if (!emailRegex.test(normalizedEmail)) {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
-      return res.status(400).json({ message: "Email already exists, please use a diffrent one" });
+      return res.status(400).json({ message: "Email already exists, please use a different one" });
+    }
+
+    if (!process.env.JWT_SECRET_KEY) {
+      console.error("JWT_SECRET_KEY is not defined");
+      return res.status(500).json({ message: "Server configuration error" });
     }
 
     const idx = Math.floor(Math.random() * 100) + 1; // generate a num between 1-100
     const randomAvatar = `https://avatar.iran.liara.run/public/${idx}.png`;
 
     const newUser = await User.create({
-      email,
-      fullName,
+      email: normalizedEmail,
+      fullName: fullName.trim(),
       password,
       profilePic: randomAvatar,
     });
@@ -54,14 +62,18 @@ export async function signup(req, res) {
 
     res.cookie("jwt", token, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: true, // prevent XSS attacks,
-      sameSite: "strict", // prevent CSRF attacks
+      httpOnly: true, // prevent XSS attacks
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // allow cross-site in production
       secure: process.env.NODE_ENV === "production",
     });
 
-    res.status(201).json({ success: true, user: newUser });
+    // Remove password from response
+    const userResponse = newUser.toObject();
+    delete userResponse.password;
+
+    res.status(201).json({ success: true, user: userResponse });
   } catch (error) {
-    console.log("Error in signup controller", error);
+    console.error("Error in signup controller:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -74,11 +86,23 @@ export async function login(req, res) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ message: "Invalid email or password" });
+    // Normalize email to lowercase for consistent lookup
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
 
     const isPasswordCorrect = await user.matchPassword(password);
-    if (!isPasswordCorrect) return res.status(401).json({ message: "Invalid email or password" });
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    if (!process.env.JWT_SECRET_KEY) {
+      console.error("JWT_SECRET_KEY is not defined");
+      return res.status(500).json({ message: "Server configuration error" });
+    }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET_KEY, {
       expiresIn: "7d",
@@ -86,14 +110,18 @@ export async function login(req, res) {
 
     res.cookie("jwt", token, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: true, // prevent XSS attacks,
-      sameSite: "strict", // prevent CSRF attacks
+      httpOnly: true, // prevent XSS attacks
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // allow cross-site in production
       secure: process.env.NODE_ENV === "production",
     });
 
-    res.status(200).json({ success: true, user });
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.status(200).json({ success: true, user: userResponse });
   } catch (error) {
-    console.log("Error in login controller", error.message);
+    console.error("Error in login controller:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
