@@ -15,9 +15,16 @@ const PORT = process.env.PORT;
 
 const __dirname = path.resolve();
 
+// Determine if we're in production (check multiple ways for Render/Vercel)
+const isProduction = process.env.NODE_ENV === "production" || 
+                     process.env.RENDER || 
+                     process.env.VERCEL ||
+                     !process.env.NODE_ENV || 
+                     process.env.NODE_ENV !== "development";
+
 app.use(
   cors({
-    origin: process.env.NODE_ENV === "production" 
+    origin: isProduction
       ? [
           "https://vibe-connect-video-calling-realtime.vercel.app",
           "https://vibe-connect-video-calling-realtime-taupe.vercel.app"

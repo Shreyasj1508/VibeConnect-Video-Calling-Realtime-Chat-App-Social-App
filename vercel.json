@@ -4,9 +4,11 @@
       "source": "/api/(.*)",
       "destination": "https://vibeconnect-video-calling-realtime-chat.onrender.com/api/$1"
     },
+    
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
 }
+

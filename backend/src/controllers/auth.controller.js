@@ -1,6 +1,7 @@
 import { upsertStreamUser } from "../lib/stream.js";
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 export async function signup(req, res) {
   const { email, password, fullName } = req.body;
@@ -10,6 +11,14 @@ export async function signup(req, res) {
 
     if (!email || !password || !fullName) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Check if database is connected
+    if (mongoose.connection.readyState !== 1) {
+      console.error("Database not connected. ReadyState:", mongoose.connection.readyState);
+      return res.status(500).json({ 
+        message: "Database connection error. Please try again later." 
+      });
     }
 
     if (password.length < 6) {
@@ -32,7 +41,9 @@ export async function signup(req, res) {
 
     if (!process.env.JWT_SECRET_KEY) {
       console.error("JWT_SECRET_KEY is not defined");
-      return res.status(500).json({ message: "Server configuration error" });
+      return res.status(500).json({ 
+        message: "Server configuration error. JWT_SECRET_KEY is missing." 
+      });
     }
 
     const idx = Math.floor(Math.random() * 100) + 1; // generate a num between 1-100
@@ -60,11 +71,16 @@ export async function signup(req, res) {
       expiresIn: "7d",
     });
 
+    // Determine if we're in production
+    const isProduction = process.env.NODE_ENV === "production" || 
+                         process.env.RENDER || 
+                         process.env.VERCEL;
+
     res.cookie("jwt", token, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true, // prevent XSS attacks
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // allow cross-site in production
-      secure: process.env.NODE_ENV === "production",
+      sameSite: isProduction ? "none" : "lax", // allow cross-site in production
+      secure: isProduction, // HTTPS only in production
     });
 
     // Remove password from response
@@ -74,7 +90,22 @@ export async function signup(req, res) {
     res.status(201).json({ success: true, user: userResponse });
   } catch (error) {
     console.error("Error in signup controller:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    // Provide more specific error messages
+    if (error.name === "MongoNetworkError" || error.name === "MongoServerSelectionError") {
+      return res.status(500).json({ 
+        message: "Database connection error. Please try again later." 
+      });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ 
+        message: "Validation error",
+        error: process.env.NODE_ENV === "development" ? error.message : undefined
+      });
+    }
+    res.status(500).json({ 
+      message: "Internal Server Error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
   }
 }
 
@@ -84,6 +115,14 @@ export async function login(req, res) {
 
     if (!email || !password) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Check if database is connected
+    if (mongoose.connection.readyState !== 1) {
+      console.error("Database not connected. ReadyState:", mongoose.connection.readyState);
+      return res.status(500).json({ 
+        message: "Database connection error. Please try again later." 
+      });
     }
 
     // Normalize email to lowercase for consistent lookup
@@ -101,8 +140,15 @@ export async function login(req, res) {
 
     if (!process.env.JWT_SECRET_KEY) {
       console.error("JWT_SECRET_KEY is not defined");
-      return res.status(500).json({ message: "Server configuration error" });
+      return res.status(500).json({ 
+        message: "Server configuration error. JWT_SECRET_KEY is missing." 
+      });
     }
+
+    // Determine if we're in production
+    const isProduction = process.env.NODE_ENV === "production" || 
+                         process.env.RENDER || 
+                         process.env.VERCEL;
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET_KEY, {
       expiresIn: "7d",
@@ -111,8 +157,8 @@ export async function login(req, res) {
     res.cookie("jwt", token, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true, // prevent XSS attacks
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // allow cross-site in production
-      secure: process.env.NODE_ENV === "production",
+      sameSite: isProduction ? "none" : "lax", // allow cross-site in production
+      secure: isProduction, // HTTPS only in production
     });
 
     // Remove password from response
@@ -122,7 +168,16 @@ export async function login(req, res) {
     res.status(200).json({ success: true, user: userResponse });
   } catch (error) {
     console.error("Error in login controller:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    // Provide more specific error messages
+    if (error.name === "MongoNetworkError" || error.name === "MongoServerSelectionError") {
+      return res.status(500).json({ 
+        message: "Database connection error. Please try again later." 
+      });
+    }
+    res.status(500).json({ 
+      message: "Internal Server Error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
   }
 }
 
